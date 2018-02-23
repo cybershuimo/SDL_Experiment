@@ -7,6 +7,7 @@
 #include <SDL_image.h>
 //#include <SDL_ttf.h>
 #include <stdio.h>
+#include <cstdlib>  //rand() needed
 #include <string>
 //#include <fstream>  //file reading and writing with SDL RWOps
 //#include <vector>
@@ -21,81 +22,12 @@ const int SCREEN_HEIGHT = 480;
 //Snake body length limit
 const int BODY_LIMIT = 100;
 
-//The snake body that follows snake head
-class Tile
-{
-    public:
-        //The dimensions of the snake body tile
-        static const int TILE_WIDTH = 20;
-        static const int TILE_HEIGHT = 20;
-
-        //Initializes
-        Tile( int x, int y );
-
-        //Sets position
-        void setPosition( int x, int y );
-
-        //Shows the tile
-        void render();
-
-        //Get the collision box
-        SDL_Rect getBox();
-
-    private:
-        //The attributes of the tile
-        SDL_Rect mBox;
-};
-
-
-//The snake that will move around on the screen
-class Snake
-{
-    public:
-        //The dimensions of the snake
-        static const int SNAKE_WIDTH = 20;
-        static const int SNAKE_HEIGHT = 20;
-
-        //Maximum axis velocity of the snake
-        static const int SNAKE_VEL = 20;
-
-        //Initializes the variables and allocates particles
-        Snake();
-
-        // //Deallocates particles
-        // ~Snake();
-
-        //Takes key presses and adjusts the snake's velocity
-        void handleEvent( SDL_Event& e );
-
-        //Moves the snake
-        void move( float timeStep );
-
-        //Shows the snake on the screen
-        void render();
-
-        //Gets length of snake body
-        int getLength();
-
-        //Get the collision box
-        SDL_Rect getBox();
-
-    private:
-        //Collision box of the snake
-        SDL_Rect mBox;
-
-        //The velocity of the snake
-        float mVelX, mVelY;
-
-        //The body length of the snake
-        int mBody;
-};
-
 
 //Texture wrapper class
 class LTexture
 {
-    public:
-        //Initializes variables
+    public
+:        //Initializes variables
         LTexture();
 
         //Deallocates memory
@@ -137,6 +69,104 @@ class LTexture
         //Image dimensions
         int mWidth;
         int mHeight;
+};
+
+//The snake body that follows snake head
+class Tile
+{
+    public:
+        //The dimensions of the snake body tile
+        static const int TILE_WIDTH = 20;
+        static const int TILE_HEIGHT = 20;
+
+        //Initializes
+        Tile( int x, int y );
+
+        //Sets position
+        void setPosition( int x, int y );
+
+        //Shows the tile
+        // void render( LTexture tileTexture ); // not working?
+
+        //Get the collision box
+        SDL_Rect getBox();
+
+    private:
+        //The attributes of the tile
+        SDL_Rect mBox;
+};
+
+class SnakeBody : public Tile
+{
+    public:
+        //Initializes
+        SnakeBody( int x, int y );
+
+        //Moves snake body
+        void move( int &posX, int &posY, SDL_Rect newRect );
+
+        //Show snake body tile
+        void render();
+
+};
+
+class Food : public Tile
+{
+    public:
+        //Initializes
+        Food( int x, int y );
+
+        //Appear at random position
+        void generate();
+
+        //Show food tile
+        void render();
+
+        //Disappear if touched by snake head
+        bool eaten( SDL_Rect snakeHead );
+};
+
+//The snake that will move around on the screen
+class Snake
+{
+    public:
+        //The dimensions of the snake
+        static const int SNAKE_WIDTH = 20;
+        static const int SNAKE_HEIGHT = 20;
+
+        //Maximum axis velocity of the snake
+        static const int SNAKE_VEL = 1;
+
+        //Initializes the variables and allocates particles
+        Snake();
+
+        // //Deallocates particles
+        // ~Snake();
+
+        //Takes key presses and adjusts the snake's velocity
+        void handleEvent( SDL_Event& e );
+
+        //Moves the snake
+        void move( int &posX, int &posY );
+
+        //Shows the snake on the screen
+        void render();
+
+        //Gets length of snake body
+        int getLength();
+
+        //Get the collision box
+        SDL_Rect getBox();
+
+    private:
+        //Collision box of the snake
+        SDL_Rect mBox;
+
+        //The velocity of the snake
+        int mVelX, mVelY;
+
+        //The body length of the snake
+        int mBody;
 };
 
 
@@ -182,9 +212,6 @@ bool loadMedia();
 //Frees media and shuts down SDL
 void close();
 
-//Store last position, move one by one
-void moveBody( Tile* snakeBody[], int length, int posX, int posY );
-
 //Box collision detector
 bool checkCollision( SDL_Rect a, SDL_Rect b );
 
@@ -198,11 +225,16 @@ SDL_Renderer* gRenderer = NULL;
 //Texture to render
 LTexture gSnakeTexture;
 LTexture gBodyTexture;
+LTexture gFoodTexture;
 
 //The snake that will be moving around on the screen
 Snake snake;
 //Snake body tiles
-Tile* snakeBody[ BODY_LIMIT ];
+SnakeBody* snakeBody[ BODY_LIMIT ];
+//Food to be eaten
+Food food( 20 * 20, 20 * 20 );
+
+
 
 // Class Tile, used for snake body tiles
 //Initializes position and type
@@ -223,16 +255,77 @@ void Tile::setPosition( int x, int y )
     mBox.y = y;
 }
 
-//Show the tile
-void Tile::render()
-{
-    gBodyTexture.render( mBox.x, mBox.y );
-}
-
 //Get the collision box
 SDL_Rect Tile::getBox()
 {
     return mBox;
+}
+
+// Class SnakeBody
+//Initializes
+SnakeBody::SnakeBody( int x, int y ) : Tile( x, y )
+{
+    // printf( "New snakeBody part created. Location %i, %i\n", x, y );
+}
+
+//Snake body moves; following snake head one by one
+void SnakeBody::move( int &posX, int &posY, SDL_Rect newRect )
+{
+    //Store last position
+    int lastX = getBox().x;
+    int lastY = getBox().y;
+
+    setPosition( posX, posY );
+    //printf( "posX is %i, posY is %i\n", posX, posY );
+
+    // if collided with new rect, stand back
+    if ( checkCollision( getBox(), newRect ) )
+    {
+        setPosition( lastX, lastY );
+    }
+
+    // pass last position to the following tile
+    posX = lastX;
+    posY = lastY;
+}
+
+//Show snake body tile
+void SnakeBody::render()
+{
+    gBodyTexture.render( getBox().x, getBox().y );
+}
+
+
+// Class Food
+//Initializes
+Food::Food( int x, int y ) : Tile( x, y )
+{
+    // printf( "New snakeBody part created. Location %i, %i\n", x, y );
+}
+
+//Appears at random position; TODO other better method to randomize position
+void Food::generate()
+{
+    int randX = rand() % 32;
+    int randY = rand() % 24;
+    setPosition( randX * 20, randY * 20 );
+}
+
+//Show food tile
+void Food::render()
+{
+    gFoodTexture.render( getBox().x, getBox().y );
+}
+
+//Check if touched by snake head;
+bool Food::eaten( SDL_Rect snakeHead )
+{
+    if ( checkCollision( getBox(), snakeHead ) )
+    {
+        return true;
+    }
+
+    return false;
 }
 
 
@@ -305,13 +398,16 @@ void Snake::handleEvent( SDL_Event& e )   // why not handleEvent( SDL_Event e )?
     // }
 }
 
-void Snake::move( float timeStep )
+//Store last position to posX, posY, and move snake collision box
+void Snake::move( int &posX, int &posY )
 {
-    //Store last position
-    moveBody( snakeBody, mBody, mBox.x, mBox.y );
-
+    //Store last position; use reference &x to change arguments
+    posX = mBox.x;
+    posY = mBox.y;
+    //printf( "posX stored %i, posY stored %i\n", posX, posY );
+    
     //Move the snake left or right
-    mBox.x += mVelX * timeStep;
+    mBox.x += mVelX * SNAKE_WIDTH; 
 
     //If the snake touches the boarder
     if ( mBox.x < 0 )
@@ -325,7 +421,7 @@ void Snake::move( float timeStep )
     }
 
     //Move the snake up or down
-    mBox.y += mVelY * timeStep;
+    mBox.y += mVelY * SNAKE_HEIGHT;
 
     //If the snake touches the boarder
     if ( mBox.y < 0 )
@@ -337,6 +433,7 @@ void Snake::move( float timeStep )
         //Move back
         mBox.y = SCREEN_HEIGHT - SNAKE_HEIGHT;
     }
+    
 }
 
 
@@ -679,14 +776,19 @@ bool loadMedia()
     bool success = true;
 
     //Load snake head texture
-    if( !gSnakeTexture.loadFromFile( "_graphic/SnakeHead.png" ) )
+    if( !gSnakeTexture.loadFromFile( "Snake/SnakeHead.png" ) )
     {
         printf( "Failed to load snake head texture!\n" );
         success = false;
     }
-    else if( !gBodyTexture.loadFromFile( "_graphic/SnakeBody-1.png" ) )
+    else if( !gBodyTexture.loadFromFile( "Snake/SnakeBody-1.png" ) )
     {
         printf( "Failed to load snake body texture!\n" );
+        success = false;
+    }
+    else if( !gFoodTexture.loadFromFile( "Snake/Food-1.png" ) )
+    {
+        printf( "Failed to load food texture!\n" );
         success = false;
     }
 
@@ -698,6 +800,7 @@ void close()
     //Free loaded images
     gSnakeTexture.free();
     gBodyTexture.free();
+    gFoodTexture.free();
 
     //Free global font
     // TTF_CloseFont( gFont );
@@ -717,24 +820,6 @@ void close()
 
     printf( "Unload resource successfully. Close the window as you like.\n" );
     std::cin.get(); 
-}
-
-void moveBody( Tile* snakeBody[], int length, int posX, int posY )
-{
-    for (int i = length - 1; i > 0; --i)
-    {
-        //Store the followed tile position
-        SDL_Rect lastPosition = snakeBody[ i - 1 ]->getBox();
-        if ( checkCollision( snakeBody[ i - 1 ]->getBox(), snakeBody[ i ]->getBox() ) == false )
-        {
-            snakeBody[ i ]->setPosition( lastPosition.x, lastPosition.y );
-        }
-    }
-
-    if ( checkCollision( snakeBody[ 0 ]->getBox(), snake.getBox() ) == false )
-    {
-        snakeBody[ 0 ]->setPosition( posX, posY );
-    }
 }
 
 bool checkCollision( SDL_Rect a, SDL_Rect b )
@@ -813,11 +898,12 @@ int main( int argc, char* args[] )
             for (int i = 0; i < snakeBodyLength; ++i)
             {
                 posX += 20;
-                snakeBody[ i ] = new Tile( posX, posY );
+                snakeBody[ i ] = new SnakeBody( posX, posY );
             }
 
             //Keeps track of time between steps
             LTimer stepTimer;
+            stepTimer.start();
 
             //The camera area
             //SDL_Rect camera = { 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
@@ -838,14 +924,26 @@ int main( int argc, char* args[] )
                     snake.handleEvent( e );
                 }
 
-                //Calculate time step; why 1000, move too slowly?
-                float timeStep = stepTimer.getTicks() / 100.f;
+                // //Calculate time step; why 1000, move too slowly?
+                // float timeStep = stepTimer.getTicks() / 100.f;
 
                 //Move the snake
-                snake.move( timeStep );
-                
-                //Restart step timer; too early?
-                stepTimer.start();
+                //Every 0.5s (this could change) moves one step (= head length)
+                if ( stepTimer.getTicks() > 500 )
+                {
+                    //Snake head moves
+                    snake.move( posX, posY );
+
+                    //Snake body moves
+                    snakeBody[ 0 ]->move( posX, posY, snake.getBox() );
+                    for (int i = 1; i < snakeBodyLength; ++i)
+                    {
+                        snakeBody[ i ]->move( posX, posY, snakeBody[ i - 1 ]->getBox() );
+                    }
+
+                    //Restart timer
+                    stepTimer.start();
+                }
 
                 //Clear screen; black background color
                 SDL_SetRenderDrawColor( gRenderer, 0x00, 0x00, 0x00, 0xFF );
@@ -856,6 +954,17 @@ int main( int argc, char* args[] )
                 for (int i = 0; i < snakeBodyLength; ++i)
                 {
                     snakeBody[ i ]->render();
+                }
+
+                //Check if Food eaten or not
+                if ( !food.eaten( snake.getBox() ) )
+                {
+                    food.render();
+                }
+                //Eaten, generate a new one
+                else
+                {
+                    food.generate();
                 }
 
                 //Update screen
