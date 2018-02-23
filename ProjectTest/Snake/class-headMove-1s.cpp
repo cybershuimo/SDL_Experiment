@@ -36,7 +36,7 @@ class Tile
         void setPosition( int x, int y );
 
         //Moves the snake
-        void move( int newX, int newY, SDL_Rect newRect );
+        void move( int &posX, int &posY, SDL_Rect newRect );
 
         //Shows the tile
         void render();
@@ -71,7 +71,7 @@ class Snake
         void handleEvent( SDL_Event& e );
 
         //Moves the snake
-        void move();
+        void move( int &posX, int &posY );
 
         //Shows the snake on the screen
         void render();
@@ -204,7 +204,6 @@ Snake snake;
 //Snake body tiles
 Tile* snakeBody[ BODY_LIMIT ];
 
-int posX, posY = 0;
 
 // Class Tile, used for snake body tiles
 //Initializes position and type
@@ -226,13 +225,14 @@ void Tile::setPosition( int x, int y )
 }
 
 //Tile moves
-void Tile::move( int newX, int newY, SDL_Rect newRect )
+void Tile::move( int &posX, int &posY, SDL_Rect newRect )
 {
     //Store last position
     int lastX = mBox.x;
     int lastY = mBox.y;
 
-    setPosition( newX, newY );
+    setPosition( posX, posY );
+    //printf( "posX is %i, posY is %i\n", posX, posY );
 
     // if collided with new rect, stand back
     if ( checkCollision( mBox, newRect ) )
@@ -274,7 +274,7 @@ Snake::Snake()
     mVelY = 0;
 
     //Initialize the snake body length
-    mBody = 1;
+    mBody = 5;
 }
 
 // //Deallocates particles
@@ -327,12 +327,14 @@ void Snake::handleEvent( SDL_Event& e )   // why not handleEvent( SDL_Event e )?
     // }
 }
 
-void Snake::move()
+//Store last position to posX, posY, and move snake collision box
+void Snake::move( int &posX, int &posY )
 {
-    //Store last position
+    //Store last position; use reference &x to change arguments
     posX = mBox.x;
     posY = mBox.y;
-
+    //printf( "posX stored %i, posY stored %i\n", posX, posY );
+    
     //Move the snake left or right
     mBox.x += mVelX * SNAKE_WIDTH; 
 
@@ -853,7 +855,7 @@ int main( int argc, char* args[] )
                 if ( stepTimer.getTicks() > 500 )
                 {
                     //Snake head moves
-                    snake.move();
+                    snake.move( posX, posY );
 
                     //Snake body moves
                     snakeBody[ 0 ]->move( posX, posY, snake.getBox() );
