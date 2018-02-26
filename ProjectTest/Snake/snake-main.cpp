@@ -7,6 +7,8 @@
 #include <SDL.h>
 #include <SDL_image.h>
 #include <stdio.h>
+//for sleep()
+#include <windows.h>
 
 //check memory leak
 #include <vld.h>
@@ -61,11 +63,11 @@ int main( int argc, char* args[] )
             LTimer stepTimer;
             stepTimer.start();
 
-            //The camera area
-            //SDL_Rect camera = { 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
+            //The game over flag
+            bool gameOver = false;
 
             //While application is running
-            while( !quit )
+            while( !quit && !gameOver )
             {
                 //Handle events on queue
                 while( SDL_PollEvent( &e ) != 0 )
@@ -88,13 +90,13 @@ int main( int argc, char* args[] )
                 if ( stepTimer.getTicks() > 200 )
                 {
                     //Snake head moves
-                    snake.move( posX, posY );
+                    snake.move( posX, posY, gameOver );
 
                     //Snake body moves
-                    snakeBody[ 0 ]->move( posX, posY, snake.getBox() );
+                    snakeBody[ 0 ]->move( posX, posY, snake.getBox(), snake.getBox(), gameOver );
                     for (int i = 1; i < snakeBodyLength; ++i)
                     {
-                        snakeBody[ i ]->move( posX, posY, snakeBody[ i - 1 ]->getBox() );
+                        snakeBody[ i ]->move( posX, posY, snakeBody[ i - 1 ]->getBox(), snake.getBox(), gameOver );
                     }
 
                     //Restart timer
@@ -106,11 +108,12 @@ int main( int argc, char* args[] )
                 SDL_RenderClear( gRenderer );
 
                 //Render objects
-                snake.render();
+                //snake.render();
                 for (int i = 0; i < snakeBodyLength; ++i)
                 {
                     snakeBody[ i ]->render();
                 }
+                snake.render();
 
                 //Check if Food eaten or not
                 if ( !food.eaten( snake.getBox() ) )
@@ -135,6 +138,16 @@ int main( int argc, char* args[] )
                 SDL_RenderPresent( gRenderer );
             }
 
+            //When Game Over, render text and update screen
+            if ( gameOver )
+            {
+            	gTextTexture.render( ( SCREEN_WIDTH - gTextTexture.getWidth() ) / 2, ( SCREEN_HEIGHT - gTextTexture.getHeight() ) / 2 );
+            	SDL_RenderPresent( gRenderer );
+            	
+            	//Wait for 3 seconds
+            	Sleep( 3000 );
+            }
+
             //Deallocate snake body tiles
             for( int i = 0; i < snakeBodyLength; ++i )
             {
@@ -145,7 +158,6 @@ int main( int argc, char* args[] )
                  }
             }
         }
-
     }
 
     //Free resources and close SDL

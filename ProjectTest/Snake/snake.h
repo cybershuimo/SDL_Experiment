@@ -5,6 +5,7 @@
 #include <iostream>
 #include <SDL.h>
 #include <SDL_image.h>
+#include <SDL_ttf.h>
 #include <string>
 
 //check memory leak
@@ -91,7 +92,7 @@ class SnakeBody : public Tile
         SnakeBody( int x, int y );
 
         //Moves snake body
-        void move( int &posX, int &posY, SDL_Rect newRect );
+        void move( int &posX, int &posY, SDL_Rect newRect, SDL_Rect headRect, bool &gameOver );
 
         //Show snake body tile
         void render();
@@ -135,7 +136,7 @@ class Snake
         void handleEvent( SDL_Event& e );
 
         //Moves the snake
-        void move( int &posX, int &posY );
+        void move( int &posX, int &posY, bool &gameOver );
 
         //Shows the snake on the screen
         void render();
@@ -207,13 +208,21 @@ void close();
 bool checkCollision( SDL_Rect a, SDL_Rect b );
 
 // Global variables
+//Screen dimension constants
+extern const int SCREEN_WIDTH;
+extern const int SCREEN_HEIGHT;
+
 //The window we'll be rendering to
 extern SDL_Window* gWindow;
 
 //The window renderer
 extern SDL_Renderer* gRenderer;
 
+//Globally used font
+extern TTF_Font* gFont;
+
 //Texture to render
 extern LTexture gSnakeTexture;
 extern LTexture gBodyTexture;
 extern LTexture gFoodTexture;
+extern LTexture gTextTexture;

@@ -6,7 +6,7 @@
 #include <iostream>
 #include <SDL.h>
 #include <SDL_image.h>
-//#include <SDL_ttf.h>
+#include <SDL_ttf.h>
 #include <stdio.h>
 #include <cstdlib>  //rand() needed
 #include <string>
@@ -26,10 +26,15 @@ SDL_Window* gWindow = NULL;
 //The window renderer
 SDL_Renderer* gRenderer = NULL;
 
+//Globally used font
+TTF_Font *gFont = NULL;
+
 //Texture to render
 LTexture gSnakeTexture;
 LTexture gBodyTexture;
 LTexture gFoodTexture;
+LTexture gTextTexture;
+
 
 // Class Tile, used for snake body tiles
 //Initializes position and type
@@ -64,7 +69,7 @@ SnakeBody::SnakeBody( int x, int y ) : Tile( x, y )
 }
 
 //Snake body moves; following snake head one by one
-void SnakeBody::move( int &posX, int &posY, SDL_Rect newRect )
+void SnakeBody::move( int &posX, int &posY, SDL_Rect newRect, SDL_Rect headRect, bool &gameOver )
 {
     //Store last position
     int lastX = getBox().x;
@@ -77,6 +82,12 @@ void SnakeBody::move( int &posX, int &posY, SDL_Rect newRect )
     if ( checkCollision( getBox(), newRect ) )
     {
         setPosition( lastX, lastY );
+    }
+
+    // if collided with snake head rect, set game over flag
+    if ( checkCollision( getBox(), headRect ) )
+    {
+    	gameOver = true;
     }
 
     // pass last position to the following tile
@@ -194,7 +205,7 @@ void Snake::handleEvent( SDL_Event& e )   // why not handleEvent( SDL_Event e )?
 }
 
 //Store last position to posX, posY, and move snake collision box
-void Snake::move( int &posX, int &posY )
+void Snake::move( int &posX, int &posY, bool &gameOver )
 {
     //Store last position; use reference &x to change arguments
     posX = mBox.x;
@@ -208,11 +219,13 @@ void Snake::move( int &posX, int &posY )
     if ( mBox.x < 0 )
     {
         mBox.x = 0;
+        gameOver = true;
     }
     else if( mBox.x + SNAKE_WIDTH > SCREEN_WIDTH )
     {
         //Move back
         mBox.x = SCREEN_WIDTH - SNAKE_WIDTH;
+        gameOver = true;
     }
 
     //Move the snake up or down
@@ -222,11 +235,13 @@ void Snake::move( int &posX, int &posY )
     if ( mBox.y < 0 )
     {
         mBox.y = 0;
+        gameOver = true;
     }
     else if( mBox.y + SNAKE_HEIGHT > SCREEN_HEIGHT )
     {
         //Move back
         mBox.y = SCREEN_HEIGHT - SNAKE_HEIGHT;
+        gameOver = true;
     }
     
 }
@@ -556,12 +571,12 @@ bool init()
                     success = false;
                 }
 
-                // //Initialize SDL_ttf
-                // if( TTF_Init() == -1 )
-                // {
-                //     printf( "SDL_ttf could not initialize! SDL_ttf Error: %s\n", TTF_GetError() );
-                //     success = false;
-                // }
+                //Initialize SDL_ttf
+                if( TTF_Init() == -1 )
+                {
+                    printf( "SDL_ttf could not initialize! SDL_ttf Error: %s\n", TTF_GetError() );
+                    success = false;
+                }
             }
         }
     }
@@ -575,7 +590,7 @@ bool loadMedia()
     //Loading success flag
     bool success = true;
 
-    //Load snake head texture
+    //Load snake head, bocy, food texture
     if( !gSnakeTexture.loadFromFile( "Snake/SnakeHead.png" ) )
     {
         printf( "Failed to load snake head texture!\n" );
@@ -592,6 +607,25 @@ bool loadMedia()
         success = false;
     }
 
+    //Load font texture
+    //Open the font
+    gFont = TTF_OpenFont( "Snake/game_over.ttf", 60 );
+    if( gFont == NULL )
+    {
+        printf( "Failed to load game_over font! SDL_ttf Error: %s\n", TTF_GetError() );
+        success = false;
+    }
+    else
+    {
+        //Render text
+        SDL_Color textColor = { 200, 0, 0 };
+        if( !gTextTexture.loadFromRenderedText( "GAME  OVER", textColor ) )
+        {
+            printf( "Failed to render text texture!\n" );
+            success = false;
+        }
+    }
+
     return success;
 }
 
@@ -601,10 +635,11 @@ void close()
     gSnakeTexture.free();
     gBodyTexture.free();
     gFoodTexture.free();
+    gTextTexture.free();
 
     //Free global font
-    // TTF_CloseFont( gFont );
-    // gFont = NULL;
+    TTF_CloseFont( gFont );
+    gFont = NULL;
     
     //Destroy window
     SDL_DestroyRenderer( gRenderer );
@@ -614,7 +649,7 @@ void close()
 
     //Quit SDL subsystems
     //Clean up all dynamically loaded library handles, freeing memory
-    //TTF_Quit();
+    TTF_Quit();
     IMG_Quit();
     SDL_Quit();
 
