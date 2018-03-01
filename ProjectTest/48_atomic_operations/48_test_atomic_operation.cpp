@@ -1,4 +1,5 @@
-//47_semaphores, with semaphores you can prevent two threads from accidentally accessing the same piece of data at once
+//48_Atomic operation, a way to lock data at a efficient CPU level. 
+//Here we'll be locking a critical section using GPU spinlocks.
 
 //Using SDL, SDL Threads, SDL_image, standard IO, and, strings
 #include <iostream>
@@ -78,6 +79,12 @@ int threadFunction( void* data )
     return 0;
 }
 
+bool init();
+
+bool loadMedia();
+
+void close();
+
 //The window we'll be rendering to
 SDL_Window* gWindow = NULL;
 
@@ -88,7 +95,10 @@ SDL_Renderer* gRenderer = NULL;
 LTexture gSplashTexture;
 
 //Data access semaphore
-SDL_sem* gDataLock = NULL;
+//SDL_sem* gDataLock = NULL;
+
+//Data access spin lock (atomic operation?)
+SDL_SpinLock gDataLock = 0;
 
 //The "data buffer"
 int gData = -1;
@@ -315,7 +325,7 @@ bool loadMedia()
     bool success = true;
 
     //Initialize semaphore
-    gDataLock = SDL_CreateSemaphore( 1 );   // SDL_sem* SDL_CreateSemaphore( initial_value )
+    //gDataLock = SDL_CreateSemaphore( 1 );   // SDL_sem* SDL_CreateSemaphore( initial_value )
 
     if( !gSplashTexture.loadFromFile( "47_semaphores/splash.png" ) )
     {
@@ -332,8 +342,8 @@ void close()
     gSplashTexture.free();
 
     //Free semaphore
-    SDL_DestroySemaphore( gDataLock );
-    gDataLock = NULL;
+    // SDL_DestroySemaphore( gDataLock );
+    // gDataLock = NULL;
     
     //Destroy window
     SDL_DestroyRenderer( gRenderer );
@@ -365,7 +375,11 @@ int worker( void* data )
         SDL_Delay( 16 + rand() % 32 );
         
         //Lock
-        SDL_SemWait( gDataLock );
+        //The atomic locks are efficient spinlocks using CPU instructions, 
+        //but are vulnerable to starvation and can spin forever if a thread holding a lock has been terminated. 
+        //For this reason you should minimize the code executed inside an atomic lock and never do expensive things 
+        //like API or system calls while holding them.
+        SDL_AtomicLock( &gDataLock );
 
         //Print pre work data
         printf( "%s gets %d\n", (char*)data, gData );
@@ -373,11 +387,12 @@ int worker( void* data )
         //"Work"
         gData = rand() % 256;
 
-        //Print post work data
-        printf( "%s sets %d\n\n", (char*)data, gData );
+        //Print pre work data
+        printf( "%s gets %d\n", (char*)data, gData );
         
         //Unlock
-        SDL_SemPost( gDataLock );
+        //SDL_SemPost( gDataLock );
+        SDL_AtomicUnlock( &gDataLock );
 
         //Wait randomly
         SDL_Delay( 16 + rand() % 640 );
