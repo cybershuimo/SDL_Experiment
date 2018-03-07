@@ -7,8 +7,6 @@
 #include <SDL.h>
 #include <SDL_image.h>
 #include <stdio.h>
-//for sleep()
-#include <windows.h>
 
 //check memory leak
 #include <vld.h>
@@ -48,6 +46,9 @@ int main( int argc, char* args[] )
             //Event handler
             SDL_Event e;
 
+            //Play Again button
+            Button playAgainButton( 0, 0 );
+
             int snakeBodyLength = snake.getLength();
             int posX = 360;   // set it as the offset X of snake head 
             int posY = 200;   // set it as the offset Y of snake head
@@ -63,11 +64,15 @@ int main( int argc, char* args[] )
             LTimer stepTimer;
             stepTimer.start();
 
-            //The game over flag
-            bool gameOver = false;
+            //Initialize UI
+            UI ui;
+
+            //The game over flags
+            bool gameOverFlag = false;
+            bool restartFlag = false;
 
             //While application is running
-            while( !quit && !gameOver )
+            while( !quit )
             {
                 //Handle events on queue
                 while( SDL_PollEvent( &e ) != 0 )
@@ -77,76 +82,142 @@ int main( int argc, char* args[] )
                     {
                         quit = true;
                     }
-
-                    //Handle input for the camera
-                    snake.handleEvent( e );
+                    else if ( !gameOverFlag )
+                    {
+                        //game is being played; Handle input for the snake head
+                        snake.handleEvent( e );
+                    }
+                    else
+                    {
+                        //game is over; Handle input for the button
+                        playAgainButton.handleEvent( e, restartFlag );
+                    }   
                 }
 
-                // //Calculate time step; why 1000, move too slowly?
-                // float timeStep = stepTimer.getTicks() / 100.f;
-
-                //Move the snake
-                //Every 0.5s (this could change) moves one step (= head length)
-                if ( stepTimer.getTicks() > 200 )
+                // 1.Game playing
+                if ( !gameOverFlag )
                 {
-                    //Snake head moves
-                    snake.move( posX, posY, gameOver );
-
-                    //Snake body moves
-                    snakeBody[ 0 ]->move( posX, posY, snake.getBox(), snake.getBox(), gameOver );
-                    for (int i = 1; i < snakeBodyLength; ++i)
+                    //Move the snake
+                    //Every 200ms (this could change) moves one step (= head length)
+                    if ( stepTimer.getTicks() > 200 )
                     {
-                        snakeBody[ i ]->move( posX, posY, snakeBody[ i - 1 ]->getBox(), snake.getBox(), gameOver );
+                        //Snake head moves
+                        snake.move( posX, posY, gameOverFlag );
+
+                        //Snake body moves
+                        snakeBody[ 0 ]->move( posX, posY, snake.getBox(), snake.getBox(), gameOverFlag );
+                        for (int i = 1; i < snakeBodyLength; ++i)
+                        {
+                            snakeBody[ i ]->move( posX, posY, snakeBody[ i - 1 ]->getBox(), snake.getBox(), gameOverFlag );
+                        }
+
+                        //Restart timer
+                        stepTimer.start();
                     }
 
-                    //Restart timer
+                    //Clear screen; black background color
+                    SDL_SetRenderDrawColor( gRenderer, 0x00, 0x00, 0x00, 0xFF );
+                    SDL_RenderClear( gRenderer );
+
+                    //Render objects
+                    //snake.render();
+                    for (int i = 0; i < snakeBodyLength; ++i)
+                    {
+                        snakeBody[ i ]->render();
+                    }
+                    snake.render();
+
+                    //Check if Food eaten or not
+                    if ( !food.eaten( snake.getBox() ) )
+                    {
+                        food.render();
+                    }
+                    //Eating food
+                    else
+                    {
+                        //Generate a new food
+                        food.generate();
+                        //Add snake length
+                        snake.addLength();
+                        snakeBodyLength = snake.getLength();
+                        if ( snakeBodyLength <= BODY_LIMIT )
+                        {
+                            snakeBody[ snakeBodyLength - 1 ] = new SnakeBody( posX, posY );
+                        }
+                        //Update numFoodEaten on UI
+                        ui.updateFoodEaten();   
+                    }
+
+                    //Update UI
+                    if ( !ui.isStarted() )
+                    {
+                        ui.start();
+                    }
+                    ui.render();
+                }
+
+                // 2.Game over and the user pressed restart button
+                else if ( gameOverFlag && restartFlag )
+                {
+                    //Deallocate previous snake body tiles
+                    for( int i = 0; i < snakeBodyLength; ++i )
+                    {
+                         if( snakeBody[ i ] != NULL )
+                         {
+                            delete snakeBody[ i ];
+                            snakeBody[ i ] = NULL;
+                         }
+                    }
+
+                    //Renew snake and body tiles
+                    snake.restart();
+                    snakeBodyLength = snake.getLength();
+                    posX = 360;   // set it as the offset X of snake head 
+                    posY = 200;   // set it as the offset Y of snake head
+
+                    //Initialize snake body
+                    for (int i = 0; i < snakeBodyLength; ++i)
+                    {
+                        posX += 20;
+                        snakeBody[ i ] = new SnakeBody( posX, posY );
+                    }
+
+                    //Clear screen; black background color
+                    SDL_SetRenderDrawColor( gRenderer, 0x00, 0x00, 0x00, 0xFF );
+                    SDL_RenderClear( gRenderer );
+
+                    //Render objects
+                    for (int i = 0; i < snakeBodyLength; ++i)
+                    {
+                        snakeBody[ i ]->render();
+                    }
+                    snake.render();
+
+                    //Keeps track of time between steps
                     stepTimer.start();
+
+                    //Restart UI
+                    ui.restart();
+
+                    //Change the game over flags to default states
+                    gameOverFlag = false;
+                    restartFlag = false;
                 }
 
-                //Clear screen; black background color
-                SDL_SetRenderDrawColor( gRenderer, 0x00, 0x00, 0x00, 0xFF );
-                SDL_RenderClear( gRenderer );
-
-                //Render objects
-                //snake.render();
-                for (int i = 0; i < snakeBodyLength; ++i)
-                {
-                    snakeBody[ i ]->render();
-                }
-                snake.render();
-
-                //Check if Food eaten or not
-                if ( !food.eaten( snake.getBox() ) )
-                {
-                    food.render();
-                }
-                //Eating food
+                // 3.Game over but not restart yet
                 else
                 {
-                    //Generate a new food
-                    food.generate();
-                    //Add snake length
-                    snake.addLength();
-                    snakeBodyLength = snake.getLength();
-                    if ( snakeBodyLength <= BODY_LIMIT )
-                    {
-                        snakeBody[ snakeBodyLength - 1 ] = new SnakeBody( posX, posY );
-                    }   
+                    //Render "Game Over" text
+                    gTextTexture.render( ( SCREEN_WIDTH - gTextTexture.getWidth() ) / 2, ( SCREEN_HEIGHT - gTextTexture.getHeight() ) / 2 );
+                    //Render "Play Again" button
+                    playAgainButton.render();
+                    //Render paused UI
+                    ui.paused();
                 }
 
                 //Update screen
                 SDL_RenderPresent( gRenderer );
-            }
-
-            //When Game Over, render text and update screen
-            if ( gameOver )
-            {
-            	gTextTexture.render( ( SCREEN_WIDTH - gTextTexture.getWidth() ) / 2, ( SCREEN_HEIGHT - gTextTexture.getHeight() ) / 2 );
-            	SDL_RenderPresent( gRenderer );
-            	
-            	//Wait for 3 seconds
-            	Sleep( 3000 );
-            }
+            }            
 
             //Deallocate snake body tiles
             for( int i = 0; i < snakeBodyLength; ++i )

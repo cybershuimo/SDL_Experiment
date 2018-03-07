@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <cstdlib>  //rand() needed
 #include <string>
-//#include <fstream>  //file reading and writing with SDL RWOps
+#include <iomanip> // setprecision
 
 //check memory leak
 #include <vld.h>
@@ -18,6 +18,7 @@
 //Screen dimension constants
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
+
 
 // Global variables
 //The window we'll be rendering to
@@ -34,6 +35,10 @@ LTexture gSnakeTexture;
 LTexture gBodyTexture;
 LTexture gFoodTexture;
 LTexture gTextTexture;
+LTexture gButtonOnTexture;
+LTexture gButtonOffTexture;
+
+LTexture gUITexture[ 2 ];
 
 
 // Class Tile, used for snake body tiles
@@ -43,9 +48,9 @@ Tile::Tile( int x, int y )
     //Get the offsets
     setPosition( x, y );
     
-    //Set the collision box
-    mBox.w = TILE_WIDTH;
-    mBox.h = TILE_HEIGHT;
+    // //Set the collision box
+    // mBox.w = TILE_WIDTH;
+    // mBox.h = TILE_HEIGHT;
 }
 
 void Tile::setPosition( int x, int y )
@@ -53,6 +58,13 @@ void Tile::setPosition( int x, int y )
     //Set the offsets
     mBox.x = x;
     mBox.y = y;
+}
+
+void Tile::setSize( int w, int h )
+{
+    //Set the width and height
+    mBox.w = w;
+    mBox.h = h;
 }
 
 //Get the collision box
@@ -65,11 +77,12 @@ SDL_Rect Tile::getBox()
 //Initializes
 SnakeBody::SnakeBody( int x, int y ) : Tile( x, y )
 {
+    setSize( 20, 20 );
     // printf( "New snakeBody part created. Location %i, %i\n", x, y );
 }
 
 //Snake body moves; following snake head one by one
-void SnakeBody::move( int &posX, int &posY, SDL_Rect newRect, SDL_Rect headRect, bool &gameOver )
+void SnakeBody::move( int &posX, int &posY, SDL_Rect newRect, SDL_Rect headRect, bool &gameOverFlag )
 {
     //Store last position
     int lastX = getBox().x;
@@ -87,7 +100,7 @@ void SnakeBody::move( int &posX, int &posY, SDL_Rect newRect, SDL_Rect headRect,
     // if collided with snake head rect, set game over flag
     if ( checkCollision( getBox(), headRect ) )
     {
-    	gameOver = true;
+    	gameOverFlag = true;
     }
 
     // pass last position to the following tile
@@ -106,6 +119,7 @@ void SnakeBody::render()
 //Initializes
 Food::Food( int x, int y ) : Tile( x, y )
 {
+    setSize( 20, 20 );
     // printf( "New snakeBody part created. Location %i, %i\n", x, y );
 }
 
@@ -132,6 +146,90 @@ bool Food::eaten( SDL_Rect snakeHead )
     }
 
     return false;
+}
+
+
+// Class Button, generated from Class Tile
+//Initializes
+Button::Button( int x, int y ) : Tile( x, y )
+{
+    setPosition( ( SCREEN_WIDTH - gButtonOffTexture.getWidth() ) / 2, ( SCREEN_HEIGHT - gButtonOffTexture.getHeight() ) * 2 / 3 );
+    setSize( gButtonOffTexture.getWidth(), gButtonOffTexture.getHeight() );
+    mButtonType = BUTTON_OFF;
+}
+
+//Handles mouse event
+void Button::handleEvent( SDL_Event& e, bool &flag )
+{
+    //If mouse event happened
+    if( e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP )
+    {
+        //Get mouse position
+        int x, y;
+        SDL_GetMouseState( &x, &y );
+        //Check if mouse is in button
+        bool inside = true;
+
+        //Mouse is left of the button
+        if( x < getBox().x )
+        {
+            inside = false;
+        }
+        //Mouse is right of the button
+        else if( x > getBox().x + getBox().w )
+        {
+            inside = false;
+        }
+        //Mouse above the button
+        else if( y < getBox().y )
+        {
+            inside = false;
+        }
+        //Mouse below the button
+        else if( y > getBox().y + getBox().h )
+        {
+            inside = false;
+        }
+
+        //Mouse is inside button
+        if( inside && e.type == SDL_MOUSEBUTTONDOWN)
+        {
+            // mouse button is pressed and heldon
+            setButtonType( BUTTON_ON );
+        }
+        else if ( inside && e.type == SDL_MOUSEBUTTONUP )
+        {
+            // mouse button is released
+            setButtonType( BUTTON_OFF );
+            changeFlag( flag );
+        }
+    }
+}
+
+//Change external flag
+void Button::changeFlag( bool &flag )
+{
+    flag = !flag;
+}
+
+//Set type of button
+void Button::setButtonType( Button::ButtonType type )
+{
+    mButtonType = type;
+}
+
+void Button::render()
+{
+    switch( mButtonType )
+    {
+        case BUTTON_OFF:
+        gButtonOffTexture.render( getBox().x, getBox().y ); //Temperary Texture
+        break;
+
+        case BUTTON_ON:
+        gButtonOnTexture.render( getBox().x, getBox().y );  //Temperary Texture
+        break;
+    }
 }
 
 
@@ -162,6 +260,12 @@ Snake::Snake()
 //         particles[ i ]->mTexture = NULL;
 //         delete particles[ i ];
 //     }
+// }
+
+//Restart to default status
+// void restart()
+// {
+//     Snake();    
 // }
 
 void Snake::handleEvent( SDL_Event& e )   // why not handleEvent( SDL_Event e )?
@@ -205,7 +309,7 @@ void Snake::handleEvent( SDL_Event& e )   // why not handleEvent( SDL_Event e )?
 }
 
 //Store last position to posX, posY, and move snake collision box
-void Snake::move( int &posX, int &posY, bool &gameOver )
+void Snake::move( int &posX, int &posY, bool &gameOverFlag )
 {
     //Store last position; use reference &x to change arguments
     posX = mBox.x;
@@ -219,13 +323,13 @@ void Snake::move( int &posX, int &posY, bool &gameOver )
     if ( mBox.x < 0 )
     {
         mBox.x = 0;
-        gameOver = true;
+        gameOverFlag = true;
     }
     else if( mBox.x + SNAKE_WIDTH > SCREEN_WIDTH )
     {
         //Move back
         mBox.x = SCREEN_WIDTH - SNAKE_WIDTH;
-        gameOver = true;
+        gameOverFlag = true;
     }
 
     //Move the snake up or down
@@ -235,13 +339,13 @@ void Snake::move( int &posX, int &posY, bool &gameOver )
     if ( mBox.y < 0 )
     {
         mBox.y = 0;
-        gameOver = true;
+        gameOverFlag = true;
     }
     else if( mBox.y + SNAKE_HEIGHT > SCREEN_HEIGHT )
     {
         //Move back
         mBox.y = SCREEN_HEIGHT - SNAKE_HEIGHT;
-        gameOver = true;
+        gameOverFlag = true;
     }
     
 }
@@ -268,7 +372,18 @@ SDL_Rect Snake::getBox()
     return mBox;
 }
 
+void Snake::restart()
+{
+    mBox.x = 360;
+    mBox.y = 200;
+    
+    //Initialize the velocity
+    mVelX = -SNAKE_VEL;
+    mVelY = 0;
 
+    //Initialize the snake body length
+    mBody = 5;
+}
 
 // Initializes
 LTexture::LTexture()
@@ -529,6 +644,73 @@ bool LTimer::isPaused()
     return mStarted && mPaused;
 }
 
+// UI class methods
+// Initializes
+UI::UI()
+{
+    //Initialize the variables
+    mStarted = false;
+    numFoodEaten = 0;
+}
+
+void UI::updateFoodEaten()
+{
+    //Add num of food eaten by one
+    ++numFoodEaten;
+}
+
+void UI::render()
+{
+    // 0 = numFoodEaten; 1 = liveTime
+    //Set text to be rendered
+    using namespace std;
+
+    liveTimeText.str( "" );
+    liveTimeText << "LIVE TIME: " << fixed << setprecision(4) << liveTime.getTicks() / 1000.0;
+    //liveTimeText << "LIVE TIME: " << fixed << setprecision(2) << liveTime.getTicks();
+    numFoodEatenText.str( "" );
+    numFoodEatenText << "FOOD EATEN: " << numFoodEaten;
+
+    //Render text
+    if( !gUITexture[ 0 ].loadFromRenderedText( liveTimeText.str().c_str(), textColor ) )
+    {
+        printf( "Failed to render UI liveTime texture!\n" );
+    }
+    else if( !gUITexture[ 1 ].loadFromRenderedText( numFoodEatenText.str().c_str(), textColor ) )
+    {
+        printf( "Failed to render UI numFoodEaten texture!\n" );
+    }
+
+    //Render text textures
+    gUITexture[ 0 ].render( ( SCREEN_WIDTH / 2 - gUITexture[ 0 ].getWidth() ) / 2, 20 );
+    gUITexture[ 1 ].render( ( SCREEN_WIDTH / 2 - gUITexture[ 0 ].getWidth() ) / 2 + SCREEN_WIDTH / 2, 20 );
+}
+
+//When game over, stop the timer
+void UI::start()
+{
+    liveTime.start();
+    mStarted = true;
+}
+
+//When game over, stop the timer
+void UI::paused()
+{
+    liveTime.stop();
+    mStarted = false;
+}
+
+void UI::restart()
+{
+    //liveTime.start();
+    numFoodEaten = 0;
+}
+
+bool UI::isStarted()
+{
+    return mStarted;
+}
+
 bool init()
 {
     //Initialization flag
@@ -609,7 +791,8 @@ bool loadMedia()
 
     //Load font texture
     //Open the font
-    gFont = TTF_OpenFont( "Snake/game_over.ttf", 60 );
+    gFont = TTF_OpenFont( "Snake/game_over.ttf", 40 );
+
     if( gFont == NULL )
     {
         printf( "Failed to load game_over font! SDL_ttf Error: %s\n", TTF_GetError() );
@@ -617,13 +800,30 @@ bool loadMedia()
     }
     else
     {
+        // set the loaded font's outline to 5 pixel wide
+        //TTF_SetFontOutline(gFont, 1);
         //Render text
-        SDL_Color textColor = { 200, 0, 0 };
-        if( !gTextTexture.loadFromRenderedText( "GAME  OVER", textColor ) )
+        SDL_Color gameOverColor = { 200, 0, 0 };
+        if( !gTextTexture.loadFromRenderedText( "GAME  OVER", gameOverColor ) )
         {
             printf( "Failed to render text texture!\n" );
             success = false;
         }
+
+        SDL_Color snakeHeadColor = { 93, 188, 210 };
+        if( !gButtonOffTexture.loadFromRenderedText( "PLAY  AGAIN", snakeHeadColor ) )
+        {
+            printf( "Failed to render PLAY AGAIN button texture!\n" );
+            success = false;
+        }
+        
+        SDL_Color snakeBodyColor = { 35, 177, 77 };
+        if( !gButtonOnTexture.loadFromRenderedText( "PLAY  AGAIN", snakeBodyColor ) )
+        {
+            printf( "Failed to render PLAY AGAIN button texture!\n" );
+            success = false;
+        }
+
     }
 
     return success;
@@ -636,6 +836,13 @@ void close()
     gBodyTexture.free();
     gFoodTexture.free();
     gTextTexture.free();
+    gButtonOnTexture.free();
+    gButtonOffTexture.free();
+
+    for (int i = 0; i < 2; ++i)
+    {
+        gUITexture[ i ].free();
+    }
 
     //Free global font
     TTF_CloseFont( gFont );
