@@ -32,7 +32,7 @@ TTF_Font *gFont = NULL;
 
 //Texture to render
 LTexture gSnakeTexture;
-LTexture gBodyTexture;
+LTexture gBodyTexture[ 2 ];
 LTexture gFoodTexture;
 LTexture gTextTexture;
 LTexture gButtonOnTexture;
@@ -78,6 +78,7 @@ SDL_Rect Tile::getBox()
 SnakeBody::SnakeBody( int x, int y ) : Tile( x, y )
 {
     setSize( 20, 20 );
+    mBodyTileType = TYPE_0;
     // printf( "New snakeBody part created. Location %i, %i\n", x, y );
 }
 
@@ -108,10 +109,11 @@ void SnakeBody::move( int &posX, int &posY, SDL_Rect newRect, SDL_Rect headRect,
     posY = lastY;
 }
 
-//Show snake body tile
-void SnakeBody::render()
+//Render snake body tile; typeIndex default snake body length
+void SnakeBody::render( int typeIndex )
 {
-    gBodyTexture.render( getBox().x, getBox().y );
+    unsigned int tileType = typeIndex % TYPE_TOTAL;
+    gBodyTexture[ tileType ].render( getBox().x, getBox().y ); 
 }
 
 
@@ -769,6 +771,9 @@ bool init()
 
 bool loadMedia()
 {
+    using namespace std;
+    std::stringstream filename;
+
     //Loading success flag
     bool success = true;
 
@@ -778,16 +783,29 @@ bool loadMedia()
         printf( "Failed to load snake head texture!\n" );
         success = false;
     }
-    else if( !gBodyTexture.loadFromFile( "Snake/SnakeBody-1.png" ) )
-    {
-        printf( "Failed to load snake body texture!\n" );
-        success = false;
-    }
-    else if( !gFoodTexture.loadFromFile( "Snake/Food-1.png" ) )
+    else if( !gFoodTexture.loadFromFile( "Snake/Food_0.png" ) )
     {
         printf( "Failed to load food texture!\n" );
         success = false;
     }
+
+    for (int i = 0; i < 2; ++i)
+    {
+        filename.str( "" );
+        filename << "Snake/SnakeBody_" << i << ".png";
+
+        if( !gBodyTexture[ i ].loadFromFile( filename.str().c_str() ) )
+        {
+            printf( "Failed to load snake body %i texture!\n", i );
+            success = false;
+        }
+    }
+
+    // else if( !gBodyTexture.loadFromFile( "Snake/SnakeBody-1.png" ) )
+    // {
+    //     printf( "Failed to load snake body texture!\n" );
+    //     success = false;
+    // }
 
     //Load font texture
     //Open the font
@@ -823,7 +841,6 @@ bool loadMedia()
             printf( "Failed to render PLAY AGAIN button texture!\n" );
             success = false;
         }
-
     }
 
     return success;
@@ -833,7 +850,12 @@ void close()
 {
     //Free loaded images
     gSnakeTexture.free();
-    gBodyTexture.free();
+    
+    for (int i = 0; i < 2; ++i)
+    {
+        gBodyTexture[ i ].free();
+    }
+    
     gFoodTexture.free();
     gTextTexture.free();
     gButtonOnTexture.free();
