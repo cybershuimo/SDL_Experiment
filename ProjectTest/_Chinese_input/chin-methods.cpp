@@ -33,6 +33,7 @@ TTF_Font *gFont = NULL;
 
 //Texture to render
 LTexture gTextTexture;
+LTexture gPromptTexture;
 
 
 // Initializes
@@ -93,7 +94,8 @@ bool LTexture::loadFromFile( std::string path )
 
 
 #ifdef _SDL_TTF_H
-bool LTexture::loadFromRenderedText( wchar_t* text, SDL_Color textColor )
+//bool LTexture::loadFromRenderedText( const char* text, SDL_Color textColor )
+bool LTexture::loadFromRenderedText( std::string text, SDL_Color textColor )
 {
     //Get rid of preexisting texture
     free();
@@ -101,7 +103,7 @@ bool LTexture::loadFromRenderedText( wchar_t* text, SDL_Color textColor )
     //Render text surface
     //To render Chinese text, use TTF_RenderUNICODE_Solid() instead of TTF_RenderText_Solid()
     //ptextUnicode = cstringToUnicode( text.c_str() );
-    SDL_Surface* textSurface = TTF_RenderUNICODE_Solid( gFont, text, textColor );
+    SDL_Surface* textSurface = TTF_RenderUTF8_Solid( gFont, text.c_str(), textColor );
     if( textSurface == NULL )
     {
         printf( "Unable to render text surface! SDL_ttf Error: %s\n", TTF_GetError() );
@@ -261,7 +263,7 @@ bool loadMedia()
 
     //Load font texture
     //Open the font
-    gFont = TTF_OpenFont( "_Chinese_input/Font/WenQuanYiMicroHei-01.ttf", 40 );
+    gFont = TTF_OpenFont( "_Chinese_input/Font/WenQuanYiMicroHei-01.ttf", 30 );
 
     if( gFont == NULL )
     {
@@ -274,10 +276,10 @@ bool loadMedia()
         //TTF_SetFontOutline(gFont, 1);
         //Render text
         SDL_Color textColor = { 200, 0, 0 };
-        wchar_t text[] = L"汉字测试";
-        if( !gTextTexture.loadFromRenderedText( text, textColor ) )
+        std::string promptText = "你的名字:  ";
+        if( !gPromptTexture.loadFromRenderedText( promptText, textColor ) )
         {
-            printf( "Failed to render text texture!\n" );
+            printf( "Failed to render promptText texture!\n" );
             success = false;
         }
     }
@@ -289,6 +291,7 @@ void close()
 {
     //Free loaded images
     gTextTexture.free();
+    gPromptTexture.free();
 
     //Free global font
     TTF_CloseFont( gFont );

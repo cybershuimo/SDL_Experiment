@@ -32,7 +32,7 @@ class LTexture
         #ifdef _SDL_TTF_H
         //Creates image from font string
         //If SDL_ttf is not defined, ignore this piece of code.
-        bool loadFromRenderedText( wchar_t* text, SDL_Color textColor );
+        bool loadFromRenderedText( std::string text, SDL_Color textColor );
         #endif
 
         //Deallocates texture
@@ -93,5 +93,6 @@ extern TTF_Font* gFont;
 
 //Texture to render
 extern LTexture gTextTexture;
+extern LTexture gPromptTexture;
 
 #endif
