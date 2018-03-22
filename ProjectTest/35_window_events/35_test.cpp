@@ -417,6 +417,7 @@ void LTexture::render( int x, int y, SDL_Rect* clip, double angle, SDL_Point* ce
     }
     
     SDL_RenderCopyEx( gRenderer, mTexture, clip, &renderQuad, angle, center, flip );
+    //SDL_RenderCopyEx( gRenderer, mTexture, clip, NULL, angle, center, flip ); //scalable texture rendering instead
     //SDL_RenderCopy( renderer, texture, &srcrect, &dstrect );
 }
 
@@ -599,6 +600,8 @@ int main( int argc, char* args[] )
 
 	                //Render objects in the center
 	                gSceneTexture.render( ( gWindow.getWidth() - gSceneTexture.getWidth() ) / 2, ( gWindow.getHeight() - gSceneTexture.getHeight() ) / 2 );
+                    //gSceneTexture.render( 0, 0 );   //scalable texture rendering instead
+
 
 	                //Update screen
                 	SDL_RenderPresent( gRenderer );
